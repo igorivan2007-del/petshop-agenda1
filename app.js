@@ -123,6 +123,7 @@ let agendamentos = [];
 let idReagendando = null;
 let totalTutores = 0;
 let totalPets = 0;
+let tutoresCache = [];
 
 $("modo").textContent = configurado
   ? ""
@@ -243,6 +244,10 @@ formTutor.addEventListener("submit", (e) => {
   if (nome.split(/\s+/).filter(Boolean).length < 2) {
     return aviso("Digite o nome completo (nome e sobrenome).", true);
   }
+  const duplicado = tutoresCache.some((t) => t.nome.trim().toLowerCase() === nome.toLowerCase());
+  if (duplicado && !confirm("Já existe um tutor cadastrado com esse nome. Cadastrar mesmo assim?")) {
+    return;
+  }
   comBotao(formTutor, async () => {
     await api.criarTutor({
       nome,
@@ -305,6 +310,7 @@ function preencherSelect(select, placeholder, itens, valor, rotulo) {
 async function carregarTutores() {
   try {
     const data = await api.listarTutores();
+    tutoresCache = data;
     totalTutores = data.length;
     preencherSelect(selectPetTutor, data.length ? "Selecione o tutor" : "Cadastre um tutor primeiro", data, (t) => t.id_tutor, (t) => t.nome);
     atualizarResumo();
