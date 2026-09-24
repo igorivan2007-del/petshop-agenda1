@@ -40,8 +40,8 @@
       <section class="card" id="sec-tutor">
         <h2>👤 Cadastrar Tutor</h2>
         <form id="form-tutor">
-          <label for="tutor-nome">Nome</label>
-          <input type="text" id="tutor-nome" placeholder="Nome do tutor" required maxlength="100">
+          <label for="tutor-nome">Nome completo</label>
+          <input type="text" id="tutor-nome" placeholder="Nome e sobrenome do tutor" required maxlength="100">
           <label for="tutor-telefone">Telefone</label>
           <input type="tel" id="tutor-telefone" placeholder="(11) 99999-9999" maxlength="20">
           <button type="submit">Cadastrar Tutor</button>
@@ -58,6 +58,8 @@
           <input type="text" id="pet-nome" placeholder="Nome do pet" required maxlength="100">
           <label for="pet-especie">Espécie</label>
           <input type="text" id="pet-especie" placeholder="Ex: cachorro, gato" required maxlength="50">
+          <label for="pet-raca">Raça</label>
+          <input type="text" id="pet-raca" placeholder="Ex: labrador, vira-lata" maxlength="50">
           <button type="submit">Cadastrar Pet</button>
         </form>
       </section>
@@ -74,7 +76,6 @@
           <select id="agendamento-hora" required>
             <option value="">Selecione o horário</option>
           </select>
-          <p class="ajuda">Funcionamento: 08h às 18h, horários de hora em hora.</p>
           <button type="submit">Agendar</button>
         </form>
       </section>
