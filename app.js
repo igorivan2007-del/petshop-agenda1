@@ -62,7 +62,7 @@ const tabelaAgendamentos = document.querySelector("#tabela-agendamentos tbody");
 const filtroStatus = $("filtro-status");
 const vazioAgenda = $("vazio");
 const modal = $("modal");
-let agendamentos = [], tutoresCache = [], totalTutores = 0, totalPets = 0, idReagendando = null;
+let agendamentos = [], tutoresCache = [], petsCache = [], totalTutores = 0, totalPets = 0, idReagendando = null;
 
 $("modo").textContent = configurado ? "" : "⚠️ Modo teste: dados salvos apenas neste navegador.";
 
@@ -94,8 +94,8 @@ function horariosOcupados(dia,ignorarId){ const set=new Set(); agendamentos.filt
 function gerarOpcoesHorario(select,dia,servico,ignorarId){ const atual=select.value; select.innerHTML='<option value="">Selecione o horário</option>'; if(!dia)return; const dur=SERVICOS[servico]?.duracao??1, ocupados=horariosOcupados(dia,ignorarId); for(let h=HORA_ABERTURA;h<=HORA_FECHAMENTO-dur;h++){ let livre=true; for(let k=0;k<dur;k++)if(ocupados.has(`${pad(h+k)}:00`))livre=false; if(livre)select.appendChild(new Option(`${pad(h)}:00`,`${pad(h)}:00`)); } if([...select.options].some(o=>o.value===atual))select.value=atual; }
 function definirMinimoData(input){ input.min=dataParaStr(new Date()); }
 
-async function carregarTutores(){ try{ const d=await api.listarTutores(); tutoresCache=Array.isArray(d)?d:[]; totalTutores=tutoresCache.length; preencherSelect(selectPetTutor,totalTutores?"Selecione o tutor":"Cadastre um tutor primeiro",tutoresCache,t=>t.id_tutor,t=>t.nome); atualizarResumo(); }catch(e){ console.error(e); preencherSelect(selectPetTutor,"Erro ao carregar tutores",[],x=>x,x=>x); aviso("Erro ao carregar tutores: "+e.message,true); } }
-async function carregarPets(){ try{ const d=await api.listarPets(); const pets=Array.isArray(d)?d:[]; totalPets=pets.length; preencherSelect(selectAgendamentoPet,totalPets?"Selecione o pet":"Cadastre um pet primeiro",pets,p=>p.id_pet,p=>`${p.nome}${p.raca?" - "+p.raca:""} (tutor: ${p.tutor?.nome??"?"})`); atualizarResumo(); }catch(e){console.error(e); aviso("Erro ao carregar pets: "+e.message,true);} }
+async function carregarTutores(){ try{ const d=await api.listarTutores(); tutoresCache=Array.isArray(d)?d:[]; totalTutores=tutoresCache.length; preencherSelect(selectPetTutor,totalTutores?"Selecione o tutor":"Cadastre um tutor primeiro",tutoresCache,t=>t.id_tutor,t=>t.nome); atualizarResumo(); renderCadastros(); }catch(e){ console.error(e); preencherSelect(selectPetTutor,"Erro ao carregar tutores",[],x=>x,x=>x); aviso("Erro ao carregar tutores: "+e.message,true); } }
+async function carregarPets(){ try{ const d=await api.listarPets(); const pets=Array.isArray(d)?d:[]; petsCache=pets; totalPets=pets.length; preencherSelect(selectAgendamentoPet,totalPets?"Selecione o pet":"Cadastre um pet primeiro",pets,p=>p.id_pet,p=>`${p.nome}${p.raca?" - "+p.raca:""} (tutor: ${p.tutor?.nome??"?"})`); atualizarResumo(); renderCadastros(); }catch(e){console.error(e); aviso("Erro ao carregar pets: "+e.message,true);} }
 async function carregarAgendamentos(){ try{ const d=await api.listarAgendamentos(); agendamentos=Array.isArray(d)?d:[]; renderAgenda(); atualizarResumo(); if($("agendamento-dia").value)gerarOpcoesHorario($("agendamento-hora"),$("agendamento-dia").value,selectAgendamentoServico.value); }catch(e){console.error(e); aviso("Erro ao carregar agenda: "+e.message,true);} }
 
 $("tutor-cpf").addEventListener("input",e=>e.target.value=formatarCpf(e.target.value));
@@ -112,5 +112,16 @@ formReagendar.addEventListener("submit",e=>{ e.preventDefault(); const dia=$("re
 function atualizarHorarios(){gerarOpcoesHorario($("agendamento-hora"),$("agendamento-dia").value,selectAgendamentoServico.value);}
 $("agendamento-dia").addEventListener("change",atualizarHorarios); selectAgendamentoServico.addEventListener("change",atualizarHorarios); $("reagendar-dia").addEventListener("change",()=>{const a=agendamentos.find(x=>String(x.id_agendamento)===String(idReagendando));if(a)gerarOpcoesHorario($("reagendar-hora"),$("reagendar-dia").value,a.servico,idReagendando);});
 
-async function iniciar(){ definirMinimoData($("agendamento-dia")); await carregarTutores(); await carregarPets(); await carregarAgendamentos(); }
+function normalizarTexto(valor){ return String(valor??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(); }
+function formatarCpfExibicao(cpf){ const v=String(cpf??"").replace(/\D/g,""); return v.length===11?v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4"):v; }
+function renderCadastros(){
+  const campo=$("pesquisa-cadastros"), tipoCampo=$("tipo-cadastro"), lista=$("lista-cadastros"); if(!campo||!tipoCampo||!lista)return;
+  const termo=normalizarTexto(campo.value.trim()), tipo=tipoCampo.value, resultados=[];
+  if(tipo==="todos"||tipo==="tutores") tutoresCache.forEach(t=>{ const texto=normalizarTexto(`${t.nome} ${t.cpf??""} ${t.telefone??""}`); if(!termo||texto.includes(termo)) resultados.push({tipo:"Tutor",nome:t.nome,detalhe:`CPF: ${formatarCpfExibicao(t.cpf)||"não informado"} | Telefone: ${t.telefone||"não informado"}`}); });
+  if(tipo==="todos"||tipo==="pets") petsCache.forEach(p=>{ const texto=normalizarTexto(`${p.nome} ${p.especie} ${p.raca??""} ${p.tutor?.nome??""}`); if(!termo||texto.includes(termo)) resultados.push({tipo:"Pet",nome:p.nome,detalhe:`${p.especie}${p.raca?" | Raça: "+p.raca:""} | Tutor: ${p.tutor?.nome??"não encontrado"}`}); });
+  lista.innerHTML=resultados.map(r=>`<div class="item-cadastro"><strong>${escapeHtml(r.tipo)}: ${escapeHtml(r.nome)}</strong><small>${escapeHtml(r.detalhe)}</small></div>`).join("");
+  $("resultado-contagem").textContent=`${resultados.length} cadastro(s) encontrado(s)`; $("cadastros-vazio").hidden=resultados.length>0;
+}
+$("pesquisa-cadastros").addEventListener("input",renderCadastros); $("tipo-cadastro").addEventListener("change",renderCadastros);
+async function iniciar(){ definirMinimoData($("agendamento-dia")); await carregarTutores(); await carregarPets(); await carregarAgendamentos(); renderCadastros(); }
 iniciar();
