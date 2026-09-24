@@ -1,127 +1,27 @@
-const SERVICOS = {
-  banho: { label: "Banho", duracao: 1 },
-  banho_tosa: { label: "Banho e Tosa", duracao: 2 },
-};
-
-const configurado = Boolean(
-  window.SUPABASE_URL &&
-  window.SUPABASE_KEY &&
-  !window.SUPABASE_URL.startsWith("COLE_") &&
-  !window.SUPABASE_KEY.startsWith("COLE_") &&
-  window.supabase
-);
-
-function criarApiSupabase() {
-  const db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
-  const ok = ({ data, error }) => {
-    if (error) {
-      throw new Error(error.code === "23505" ? "Já existe um cadastro com esse valor." : error.message);
-    }
-    return data || [];
-  };
-  return {
-    listarTutores: async () => ok(await db.from("tutor").select("id_tutor,nome,cpf,telefone").order("nome")),
-    criarTutor: async (t) => ok(await db.from("tutor").insert([t]).select()),
-    listarPets: async () => ok(await db.from("pet").select("id_pet,nome,especie,raca,id_tutor,tutor(nome)").order("nome")),
-    criarPet: async (p) => ok(await db.from("pet").insert([p]).select()),
-    listarAgendamentos: async () => ok(await db.from("agendamento").select("id_agendamento,data_hora,status,servico,id_pet,pet(nome,especie,raca,tutor(nome))").order("data_hora")),
-    criarAgendamento: async (a) => ok(await db.from("agendamento").insert([a]).select()),
-    atualizarAgendamento: async (id, campos) => ok(await db.from("agendamento").update(campos).eq("id_agendamento", id).select()),
-  };
-}
-
-function criarApiLocal() {
-  const KEY = "petshop-agenda-local";
-  const vazio = () => ({ tutor: [], pet: [], agendamento: [], seq: 0 });
-  const ler = () => {
-    try { return JSON.parse(localStorage.getItem(KEY)) || vazio(); }
-    catch { return vazio(); }
-  };
-  const gravar = (d) => localStorage.setItem(KEY, JSON.stringify(d));
-  return {
-    listarTutores: async () => ler().tutor.slice().sort((a,b) => a.nome.localeCompare(b.nome)),
-    criarTutor: async (t) => { const d=ler(); d.tutor.push({id_tutor:++d.seq,...t}); gravar(d); },
-    listarPets: async () => { const d=ler(); return d.pet.map(p => ({...p,tutor:d.tutor.find(t => t.id_tutor===p.id_tutor)})).sort((a,b)=>a.nome.localeCompare(b.nome)); },
-    criarPet: async (p) => { const d=ler(); d.pet.push({id_pet:++d.seq,...p,id_tutor:Number(p.id_tutor)}); gravar(d); },
-    listarAgendamentos: async () => { const d=ler(); return d.agendamento.map(a => { const p=d.pet.find(x=>x.id_pet===a.id_pet); return {...a,pet:p?{...p,tutor:d.tutor.find(t=>t.id_tutor===p.id_tutor)}:null}; }).sort((a,b)=>new Date(a.data_hora)-new Date(b.data_hora)); },
-    criarAgendamento: async (a) => { const d=ler(); d.agendamento.push({id_agendamento:++d.seq,...a,id_pet:Number(a.id_pet),status:"agendado"}); gravar(d); },
-    atualizarAgendamento: async (id, campos) => { const d=ler(); const a=d.agendamento.find(x=>x.id_agendamento===Number(id)); if(!a) throw new Error("Agendamento não encontrado."); Object.assign(a,campos); gravar(d); },
-  };
-}
-
-const api = configurado ? criarApiSupabase() : criarApiLocal();
-const $ = (id) => document.getElementById(id);
-const formTutor = $("form-tutor");
-const formPet = $("form-pet");
-const formAgendamento = $("form-agendamento");
-const formReagendar = $("form-reagendar");
-const selectPetTutor = $("pet-tutor");
-const selectAgendamentoPet = $("agendamento-pet");
-const selectAgendamentoServico = $("agendamento-servico");
-const tabelaAgendamentos = document.querySelector("#tabela-agendamentos tbody");
-const filtroStatus = $("filtro-status");
-const vazioAgenda = $("vazio");
-const modal = $("modal");
-let agendamentos = [], tutoresCache = [], petsCache = [], totalTutores = 0, totalPets = 0, idReagendando = null;
-
-$("modo").textContent = configurado ? "" : "⚠️ Modo teste: dados salvos apenas neste navegador.";
-
-document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => {
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  $("painel-cadastros").hidden = btn.dataset.tab !== "cadastros";
-  $("painel-agenda").hidden = btn.dataset.tab !== "agenda";
-}));
-
-const pad = n => String(n).padStart(2,"0");
-function dataParaStr(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function horaParaStr(d){ return `${pad(d.getHours())}:00`; }
-function combinarDataHora(d,h){ return new Date(`${d}T${h}:00`).toISOString(); }
-function parseData(v){ return new Date(v); }
-function escapeHtml(v){ return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-function emojiEspecie(v){ const e=(v||"").toLowerCase(); if(e.includes("cach")||e.includes("dog")||e.includes("cão"))return "🐶"; if(e.includes("gat")||e.includes("cat"))return "🐱"; if(e.includes("ave")||e.includes("pass"))return "🐦"; if(e.includes("coelho"))return "🐰"; return "🐾"; }
-function cpfValido(v){ const c=(v||"").replace(/\D/g,""); if(c.length!==11||/^(\d)\1{10}$/.test(c))return false; let s=0; for(let i=0;i<9;i++)s+=Number(c[i])*(10-i); let r=(s*10)%11; if(r===10)r=0; if(r!==Number(c[9]))return false; s=0; for(let i=0;i<10;i++)s+=Number(c[i])*(11-i); r=(s*10)%11; if(r===10)r=0; return r===Number(c[10]); }
-function formatarCpf(v){ const c=(v||"").replace(/\D/g,"").slice(0,11); return c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4"); }
-
-let toastTimer;
-function aviso(msg,erro=false){ const t=$("toast"); t.textContent=msg; t.className="toast"+(erro?" erro":""); t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true,3500); }
-async function comBotao(form,fn){ const b=form.querySelector('button[type="submit"]'); b.disabled=true; try{await fn();}catch(e){console.error(e); aviso(e.message||"Erro inesperado.",true);}finally{b.disabled=false;} }
-function preencherSelect(select,texto,itens,valor,rotulo){ select.innerHTML=""; select.appendChild(new Option(texto,"")); itens.forEach(i=>select.appendChild(new Option(rotulo(i),valor(i)))); }
-function atualizarResumo(){ $("stat-tutores").textContent=totalTutores; $("stat-pets").textContent=totalPets; const hoje=dataParaStr(new Date()); $("stat-hoje").textContent=agendamentos.filter(a=>a.status==="agendado"&&dataParaStr(parseData(a.data_hora))===hoje).length; $("stat-agendados").textContent=agendamentos.filter(a=>a.status==="agendado").length; }
-
-const HORA_ABERTURA=8, HORA_FECHAMENTO=18;
-function horariosOcupados(dia,ignorarId){ const set=new Set(); agendamentos.filter(a=>a.status==="agendado"&&String(a.id_agendamento)!==String(ignorarId)).forEach(a=>{ const d=parseData(a.data_hora); if(dataParaStr(d)!==dia)return; const dur=SERVICOS[a.servico]?.duracao??1; for(let k=0;k<dur;k++)set.add(`${pad(d.getHours()+k)}:00`); }); return set; }
-function gerarOpcoesHorario(select,dia,servico,ignorarId){ const atual=select.value; select.innerHTML='<option value="">Selecione o horário</option>'; if(!dia)return; const dur=SERVICOS[servico]?.duracao??1, ocupados=horariosOcupados(dia,ignorarId); for(let h=HORA_ABERTURA;h<=HORA_FECHAMENTO-dur;h++){ let livre=true; for(let k=0;k<dur;k++)if(ocupados.has(`${pad(h+k)}:00`))livre=false; if(livre)select.appendChild(new Option(`${pad(h)}:00`,`${pad(h)}:00`)); } if([...select.options].some(o=>o.value===atual))select.value=atual; }
-function definirMinimoData(input){ input.min=dataParaStr(new Date()); }
-
-async function carregarTutores(){ try{ const d=await api.listarTutores(); tutoresCache=Array.isArray(d)?d:[]; totalTutores=tutoresCache.length; preencherSelect(selectPetTutor,totalTutores?"Selecione o tutor":"Cadastre um tutor primeiro",tutoresCache,t=>t.id_tutor,t=>t.nome); atualizarResumo(); renderCadastros(); }catch(e){ console.error(e); preencherSelect(selectPetTutor,"Erro ao carregar tutores",[],x=>x,x=>x); aviso("Erro ao carregar tutores: "+e.message,true); } }
-async function carregarPets(){ try{ const d=await api.listarPets(); const pets=Array.isArray(d)?d:[]; petsCache=pets; totalPets=pets.length; preencherSelect(selectAgendamentoPet,totalPets?"Selecione o pet":"Cadastre um pet primeiro",pets,p=>p.id_pet,p=>`${p.nome}${p.raca?" - "+p.raca:""} (tutor: ${p.tutor?.nome??"?"})`); atualizarResumo(); renderCadastros(); }catch(e){console.error(e); aviso("Erro ao carregar pets: "+e.message,true);} }
-async function carregarAgendamentos(){ try{ const d=await api.listarAgendamentos(); agendamentos=Array.isArray(d)?d:[]; renderAgenda(); atualizarResumo(); if($("agendamento-dia").value)gerarOpcoesHorario($("agendamento-hora"),$("agendamento-dia").value,selectAgendamentoServico.value); }catch(e){console.error(e); aviso("Erro ao carregar agenda: "+e.message,true);} }
-
-$("tutor-cpf").addEventListener("input",e=>e.target.value=formatarCpf(e.target.value));
-formTutor.addEventListener("submit",e=>{ e.preventDefault(); const nome=$("tutor-nome").value.trim(), cpf=$("tutor-cpf").value.trim(), cpfLimpo=cpf.replace(/\D/g,""); if(nome.split(/\s+/).length<2)return aviso("Digite nome e sobrenome.",true); if(!cpfValido(cpf))return aviso("CPF inválido.",true); if(tutoresCache.some(t=>t.nome.trim().toLowerCase()===nome.toLowerCase()))return aviso("Já existe tutor com esse nome.",true); if(tutoresCache.some(t=>String(t.cpf||"").replace(/\D/g,"")===cpfLimpo))return aviso("Já existe tutor com esse CPF.",true); comBotao(formTutor,async()=>{ await api.criarTutor({nome,cpf:cpfLimpo,telefone:$("tutor-telefone").value.trim()||null}); formTutor.reset(); await carregarTutores(); aviso("Tutor cadastrado!"); }); });
-formPet.addEventListener("submit",e=>{ e.preventDefault(); if(!selectPetTutor.value)return aviso("Selecione o tutor.",true); comBotao(formPet,async()=>{ await api.criarPet({id_tutor:Number(selectPetTutor.value),nome:$("pet-nome").value.trim(),especie:$("pet-especie").value.trim(),raca:$("pet-raca").value.trim()||null}); formPet.reset(); await carregarPets(); aviso("Pet cadastrado!"); }); });
-formAgendamento.addEventListener("submit",e=>{ e.preventDefault(); const dia=$("agendamento-dia").value,hora=$("agendamento-hora").value,servico=selectAgendamentoServico.value; if(!selectAgendamentoPet.value||!dia||!hora)return aviso("Preencha pet, data e horário.",true); const iso=combinarDataHora(dia,hora); if(new Date(iso)<new Date())return aviso("Escolha data e hora futuras.",true); comBotao(formAgendamento,async()=>{ await api.criarAgendamento({id_pet:Number(selectAgendamentoPet.value),data_hora:iso,servico}); formAgendamento.reset(); await carregarAgendamentos(); aviso("Agendamento realizado!"); }); });
-
-function renderAgenda(){ const lista=agendamentos.filter(a=>filtroStatus.value==="todos"||a.status===filtroStatus.value); tabelaAgendamentos.innerHTML=""; vazioAgenda.hidden=lista.length>0; lista.forEach(a=>{ const tr=document.createElement("tr"), ativo=a.status==="agendado"; tr.innerHTML=`<td data-label="Pet">${emojiEspecie(a.pet?.especie)} ${escapeHtml(a.pet?.nome??"?")}</td><td data-label="Tutor">${escapeHtml(a.pet?.tutor?.nome??"?")}</td><td data-label="Serviço">${escapeHtml(SERVICOS[a.servico]?.label??"Banho")}</td><td data-label="Data/Hora">${parseData(a.data_hora).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</td><td data-label="Status"><span class="badge badge-${escapeHtml(a.status)}">${escapeHtml(a.status)}</span></td><td class="acoes-cell"><div class="acoes">${ativo?`<button type="button" class="btn-reagendar" data-id="${a.id_agendamento}">Reagendar</button><button type="button" class="btn-concluir" data-id="${a.id_agendamento}">Concluir</button><button type="button" class="btn-cancelar" data-id="${a.id_agendamento}">Cancelar</button>`:""}</div></td>`; tabelaAgendamentos.appendChild(tr); }); document.querySelectorAll(".btn-concluir,.btn-cancelar").forEach(b=>b.addEventListener("click",async()=>{ const status=b.classList.contains("btn-cancelar")?"cancelado":"concluido"; if(status==="cancelado"&&!confirm("Cancelar este agendamento?"))return; try{await api.atualizarAgendamento(b.dataset.id,{status}); await carregarAgendamentos(); aviso(status==="cancelado"?"Agendamento cancelado.":"Serviço concluído!");}catch(e){aviso(e.message,true);} })); document.querySelectorAll(".btn-reagendar").forEach(b=>b.addEventListener("click",()=>abrirModal(agendamentos.find(a=>String(a.id_agendamento)===b.dataset.id)))); }
-filtroStatus.addEventListener("change",renderAgenda);
-function abrirModal(a){ if(!a)return; idReagendando=a.id_agendamento; $("reagendar-info").textContent=`${a.pet?.nome??"Pet"} - ${SERVICOS[a.servico]?.label??"Banho"} - atual: ${parseData(a.data_hora).toLocaleString("pt-BR")}`; const d=parseData(a.data_hora); $("reagendar-dia").value=dataParaStr(d); gerarOpcoesHorario($("reagendar-hora"),$("reagendar-dia").value,a.servico,a.id_agendamento); $("reagendar-hora").value=horaParaStr(d); definirMinimoData($("reagendar-dia")); modal.hidden=false; }
-function fecharModal(){modal.hidden=true;idReagendando=null;}
-$("reagendar-cancelar").addEventListener("click",fecharModal); modal.addEventListener("click",e=>{if(e.target===modal)fecharModal();}); document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!modal.hidden)fecharModal();});
-formReagendar.addEventListener("submit",e=>{ e.preventDefault(); const dia=$("reagendar-dia").value,hora=$("reagendar-hora").value; if(!dia||!hora)return aviso("Escolha data e horário.",true); const iso=combinarDataHora(dia,hora); if(new Date(iso)<new Date())return aviso("Escolha data e hora futuras.",true); comBotao(formReagendar,async()=>{await api.atualizarAgendamento(idReagendando,{data_hora:iso});fecharModal();await carregarAgendamentos();aviso("Agendamento reagendado!");}); });
-function atualizarHorarios(){gerarOpcoesHorario($("agendamento-hora"),$("agendamento-dia").value,selectAgendamentoServico.value);}
-$("agendamento-dia").addEventListener("change",atualizarHorarios); selectAgendamentoServico.addEventListener("change",atualizarHorarios); $("reagendar-dia").addEventListener("change",()=>{const a=agendamentos.find(x=>String(x.id_agendamento)===String(idReagendando));if(a)gerarOpcoesHorario($("reagendar-hora"),$("reagendar-dia").value,a.servico,idReagendando);});
-
-function normalizarTexto(valor){ return String(valor??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(); }
-function formatarCpfExibicao(cpf){ const v=String(cpf??"").replace(/\D/g,""); return v.length===11?v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4"):v; }
-function renderCadastros(){
-  const campo=$("pesquisa-cadastros"), tipoCampo=$("tipo-cadastro"), lista=$("lista-cadastros"); if(!campo||!tipoCampo||!lista)return;
-  const termo=normalizarTexto(campo.value.trim()), tipo=tipoCampo.value, resultados=[];
-  if(tipo==="todos"||tipo==="tutores") tutoresCache.forEach(t=>{ const texto=normalizarTexto(`${t.nome} ${t.cpf??""} ${t.telefone??""}`); if(!termo||texto.includes(termo)) resultados.push({tipo:"Tutor",nome:t.nome,detalhe:`CPF: ${formatarCpfExibicao(t.cpf)||"não informado"} | Telefone: ${t.telefone||"não informado"}`}); });
-  if(tipo==="todos"||tipo==="pets") petsCache.forEach(p=>{ const texto=normalizarTexto(`${p.nome} ${p.especie} ${p.raca??""} ${p.tutor?.nome??""}`); if(!termo||texto.includes(termo)) resultados.push({tipo:"Pet",nome:p.nome,detalhe:`${p.especie}${p.raca?" | Raça: "+p.raca:""} | Tutor: ${p.tutor?.nome??"não encontrado"}`}); });
-  lista.innerHTML=resultados.map(r=>`<div class="item-cadastro"><strong>${escapeHtml(r.tipo)}: ${escapeHtml(r.nome)}</strong><small>${escapeHtml(r.detalhe)}</small></div>`).join("");
-  $("resultado-contagem").textContent=`${resultados.length} cadastro(s) encontrado(s)`; $("cadastros-vazio").hidden=resultados.length>0;
-}
-$("pesquisa-cadastros").addEventListener("input",renderCadastros); $("tipo-cadastro").addEventListener("change",renderCadastros);
-async function iniciar(){ definirMinimoData($("agendamento-dia")); await carregarTutores(); await carregarPets(); await carregarAgendamentos(); renderCadastros(); }
-iniciar();
+const SERVICOS={banho:{label:"Banho",duracao:1},banho_tosa:{label:"Banho e Tosa",duracao:2}};
+const FUSO="America/Sao_Paulo",$=id=>document.getElementById(id),pad=n=>String(n).padStart(2,"0");
+const configurado=Boolean(window.SUPABASE_URL&&window.SUPABASE_KEY&&!window.SUPABASE_URL.startsWith("COLE_")&&window.supabase);
+function apiSupabase(){const db=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_KEY);const ok=({data,error})=>{if(error)throw new Error(error.message);return data||[]};return{listarTutores:async()=>ok(await db.from("tutor").select("id_tutor,nome,cpf,telefone").order("nome")),criarTutor:async x=>ok(await db.from("tutor").insert([x]).select()),listarPets:async()=>ok(await db.from("pet").select("id_pet,nome,especie,raca,id_tutor,tutor(nome)").order("nome")),criarPet:async x=>ok(await db.from("pet").insert([x]).select()),listarAgendamentos:async()=>ok(await db.from("agendamento").select("id_agendamento,data_hora,status,servico,id_pet,pet(nome,especie,raca,tutor(nome))").order("data_hora")),criarAgendamento:async x=>ok(await db.from("agendamento").insert([x]).select()),atualizarAgendamento:async(id,x)=>ok(await db.from("agendamento").update(x).eq("id_agendamento",id).select())}}
+function apiLocal(){const K="petshop-agenda-local",v=()=>({tutor:[],pet:[],agendamento:[],seq:0}),ler=()=>{try{return JSON.parse(localStorage.getItem(K))||v()}catch{return v()}},salvar=d=>localStorage.setItem(K,JSON.stringify(d));return{listarTutores:async()=>ler().tutor,criarTutor:async x=>{const d=ler();d.tutor.push({id_tutor:++d.seq,...x});salvar(d)},listarPets:async()=>{const d=ler();return d.pet.map(p=>({...p,tutor:d.tutor.find(t=>t.id_tutor===p.id_tutor)}))},criarPet:async x=>{const d=ler();d.pet.push({id_pet:++d.seq,...x,id_tutor:Number(x.id_tutor)});salvar(d)},listarAgendamentos:async()=>{const d=ler();return d.agendamento.map(a=>{const p=d.pet.find(x=>x.id_pet===a.id_pet);return{...a,pet:p?{...p,tutor:d.tutor.find(t=>t.id_tutor===p.id_tutor)}:null}})},criarAgendamento:async x=>{const d=ler();d.agendamento.push({id_agendamento:++d.seq,...x,id_pet:Number(x.id_pet),status:"agendado"});salvar(d)},atualizarAgendamento:async(id,x)=>{const d=ler(),a=d.agendamento.find(x=>x.id_agendamento===Number(id));Object.assign(a,x);salvar(d)}}}
+const api=configurado?apiSupabase():apiLocal();let tutores=[],pets=[],agendamentos=[],idReagendar=null;
+function partes(v){return Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:FUSO,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(new Date(v)).map(p=>[p.type,p.value]))}function diaBR(v){const p=partes(v);return`${p.year}-${p.month}-${p.day}`}function horaBR(v){return Number(partes(v).hour)}function exibir(v){return new Intl.DateTimeFormat("pt-BR",{timeZone:FUSO,dateStyle:"short",timeStyle:"short"}).format(new Date(v))}function iso(d,h){return new Date(`${d}T${h}:00-03:00`).toISOString()}function hoje(){const d=new Date();return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()}function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+let timer;function aviso(m,e=false){const t=$("toast");t.textContent=m;t.className="toast"+(e?" erro":"");t.hidden=false;clearTimeout(timer);timer=setTimeout(()=>t.hidden=true,3000)}async function acao(form,fn){const b=form.querySelector('button[type="submit"]');b.disabled=true;try{await fn()}catch(e){console.error(e);aviso(e.message,true)}finally{b.disabled=false}}
+function select(el,texto,dados,val,rot){el.innerHTML="";el.add(new Option(texto,""));dados.forEach(x=>el.add(new Option(rot(x),val(x))))}
+function filtrarPets(){const q=norm($("pesquisa-pet").value),r=pets.filter(p=>!q||norm(`${p.nome} ${p.tutor?.nome} ${p.raca} ${p.especie}`).includes(q));select($("agendamento-pet"),r.length?"Selecione o pet":"Nenhum cadastro encontrado",r,p=>p.id_pet,p=>`${p.nome}${p.raca?" - "+p.raca:""} (tutor: ${p.tutor?.nome||"?"})`);$("pesquisa-pet-info").textContent=q?`${r.length} cadastro(s) encontrado(s).`:"Digite acima para encontrar o cadastro rapidamente."}
+function resumo(){$("stat-tutores").textContent=tutores.length;$("stat-pets").textContent=pets.length;$("stat-hoje").textContent=agendamentos.filter(a=>a.status==="agendado"&&diaBR(a.data_hora)===hoje()).length;$("stat-agendados").textContent=agendamentos.filter(a=>a.status==="agendado").length}
+async function carregarTutores(){tutores=await api.listarTutores();select($("pet-tutor"),tutores.length?"Selecione o tutor":"Cadastre um tutor primeiro",tutores,t=>t.id_tutor,t=>t.nome);resumo()}async function carregarPets(){pets=await api.listarPets();filtrarPets();resumo()}async function carregarAgenda(){agendamentos=await api.listarAgendamentos();render();resumo()}
+function ocupados(dia,ignorar){const s=new Set();agendamentos.filter(a=>a.status==="agendado"&&String(a.id_agendamento)!==String(ignorar)&&diaBR(a.data_hora)===dia).forEach(a=>{for(let k=0;k<(SERVICOS[a.servico]?.duracao||1);k++)s.add(`${pad(horaBR(a.data_hora)+k)}:00`)});return s}function horarios(el,dia,serv,ignorar){el.innerHTML='<option value="">Selecione o horário</option>';if(!dia)return;const dur=SERVICOS[serv]?.duracao||1,o=ocupados(dia,ignorar);for(let h=8;h<=18-dur;h++){let livre=true;for(let k=0;k<dur;k++)if(o.has(`${pad(h+k)}:00`))livre=false;if(livre)el.add(new Option(`${pad(h)}:00`,`${pad(h)}:00`))}}
+function render(){const lista=agendamentos.filter(a=>$("filtro-status").value==="todos"||a.status===$("filtro-status").value);$("tabela-agendamentos").querySelector("tbody").innerHTML=lista.map(a=>`<tr><td data-label="Pet">🐾 ${esc(a.pet?.nome||"?")}</td><td data-label="Tutor">${esc(a.pet?.tutor?.nome||"?")}</td><td data-label="Serviço">${SERVICOS[a.servico]?.label||"Banho"}</td><td data-label="Data/Hora">${exibir(a.data_hora)}</td><td data-label="Status"><span class="badge badge-${a.status}">${a.status}</span></td><td class="acoes-cell"><div class="acoes">${a.status==="agendado"?`<button class="btn-reagendar" data-id="${a.id_agendamento}">Reagendar</button><button class="btn-concluir" data-id="${a.id_agendamento}">Concluir</button><button class="btn-cancelar" data-id="${a.id_agendamento}">Cancelar</button>`:""}</div></td></tr>`).join("");$("vazio").hidden=lista.length>0;document.querySelectorAll(".btn-concluir,.btn-cancelar").forEach(b=>b.onclick=async()=>{const status=b.classList.contains("btn-cancelar")?"cancelado":"concluido";if(status==="cancelado"&&!confirm("Cancelar este agendamento?"))return;await api.atualizarAgendamento(b.dataset.id,{status});await carregarAgenda()});document.querySelectorAll(".btn-reagendar").forEach(b=>b.onclick=()=>abrir(agendamentos.find(a=>String(a.id_agendamento)===b.dataset.id)))}
+function abrir(a){idReagendar=a.id_agendamento;$("reagendar-info").textContent=`${a.pet?.nome||"Pet"} - atual: ${exibir(a.data_hora)}`;$("reagendar-dia").value=diaBR(a.data_hora);horarios($("reagendar-hora"),diaBR(a.data_hora),a.servico,a.id_agendamento);$("reagendar-hora").value=`${pad(horaBR(a.data_hora))}:00`;$("modal").hidden=false}
+$("pesquisa-pet").oninput=filtrarPets;$("agendamento-dia").onchange=()=>horarios($("agendamento-hora"),$("agendamento-dia").value,$("agendamento-servico").value);$("agendamento-servico").onchange=$("agendamento-dia").onchange;$("filtro-status").onchange=render;
+document.querySelectorAll(".tab-btn").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab-btn").forEach(x=>x.classList.remove("active"));b.classList.add("active");$("painel-cadastros").hidden=b.dataset.tab!=="cadastros";$("painel-agenda").hidden=b.dataset.tab!=="agenda"});
+$("tutor-cpf").oninput=e=>{let v=e.target.value.replace(/\D/g,"").slice(0,11);e.target.value=v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4")};
+$("form-tutor").onsubmit=e=>{e.preventDefault();acao(e.target,async()=>{await api.criarTutor({nome:$("tutor-nome").value.trim(),cpf:$("tutor-cpf").value.replace(/\D/g,""),telefone:$("tutor-telefone").value.trim()||null});e.target.reset();await carregarTutores();aviso("Tutor cadastrado!")})};
+$("form-pet").onsubmit=e=>{e.preventDefault();acao(e.target,async()=>{await api.criarPet({id_tutor:Number($("pet-tutor").value),nome:$("pet-nome").value.trim(),especie:$("pet-especie").value.trim(),raca:$("pet-raca").value.trim()||null});e.target.reset();await carregarPets();aviso("Pet cadastrado!")})};
+$("form-agendamento").onsubmit=e=>{e.preventDefault();acao(e.target,async()=>{await api.criarAgendamento({id_pet:Number($("agendamento-pet").value),servico:$("agendamento-servico").value,data_hora:iso($("agendamento-dia").value,$("agendamento-hora").value)});e.target.reset();$("pesquisa-pet").value="";filtrarPets();await carregarAgenda();aviso("Agendamento realizado!")})};
+$("reagendar-cancelar").onclick=()=>$("modal").hidden=true;$("reagendar-dia").onchange=()=>{const a=agendamentos.find(x=>String(x.id_agendamento)===String(idReagendar));horarios($("reagendar-hora"),$("reagendar-dia").value,a.servico,idReagendar)};$("form-reagendar").onsubmit=e=>{e.preventDefault();acao(e.target,async()=>{await api.atualizarAgendamento(idReagendar,{data_hora:iso($("reagendar-dia").value,$("reagendar-hora").value)});$("modal").hidden=true;await carregarAgenda();aviso("Agendamento reagendado!")})};
+function normalizarCadastro(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()}
+function cpfExibicao(v){const n=String(v??"").replace(/\D/g,"");return n.length===11?n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4"):n}
+function renderCadastros(){const campo=$("pesquisa-cadastros"),filtro=$("tipo-cadastro"),lista=$("lista-cadastros"),contagem=$("resultado-contagem"),vazio=$("cadastros-vazio");if(!campo||!filtro||!lista)return;const termo=normalizarCadastro(campo.value.trim());if(!termo){lista.innerHTML="";lista.hidden=true;vazio.hidden=true;contagem.textContent="Digite algo para pesquisar um cadastro.";return}const resultados=[];if(filtro.value==="todos"||filtro.value==="tutores")tutores.forEach(t=>{if(normalizarCadastro(`${t.nome} ${t.cpf??""} ${t.telefone??""}`).includes(termo))resultados.push({tipo:"Tutor",nome:t.nome,detalhe:`CPF: ${cpfExibicao(t.cpf)||"não informado"} | Telefone: ${t.telefone||"não informado"}`})});if(filtro.value==="todos"||filtro.value==="pets")pets.forEach(p=>{if(normalizarCadastro(`${p.nome} ${p.especie} ${p.raca??""} ${p.tutor?.nome??""}`).includes(termo))resultados.push({tipo:"Pet",nome:p.nome,detalhe:`${p.especie}${p.raca?" | Raça: "+p.raca:""} | Tutor: ${p.tutor?.nome??"não encontrado"}`})});lista.innerHTML=resultados.map(r=>`<div class="item-cadastro"><strong>${esc(r.tipo)}: ${esc(r.nome)}</strong><small>${esc(r.detalhe)}</small></div>`).join("");lista.hidden=resultados.length===0;vazio.hidden=resultados.length>0;contagem.textContent=`${resultados.length} cadastro(s) encontrado(s).`}
+$("pesquisa-cadastros").oninput=renderCadastros;$("tipo-cadastro").onchange=renderCadastros;
+(async()=>{$("modo").textContent=configurado?"":"⚠️ Modo teste: dados salvos neste navegador.";$("agendamento-dia").min=hoje();$("reagendar-dia").min=hoje();await carregarTutores();await carregarPets();await carregarAgenda()})();
