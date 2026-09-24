@@ -35,80 +35,101 @@
       </div>
     </section>
 
-    <div class="grid">
-      <!-- CADASTRAR TUTOR -->
-      <section class="card" id="sec-tutor">
-        <h2>👤 Cadastrar Tutor</h2>
-        <form id="form-tutor">
-          <label for="tutor-nome">Nome completo</label>
-          <input type="text" id="tutor-nome" placeholder="Nome e sobrenome do tutor" required maxlength="100">
-          <label for="tutor-telefone">Telefone</label>
-          <input type="tel" id="tutor-telefone" placeholder="(11) 99999-9999" maxlength="20">
-          <button type="submit">Cadastrar Tutor</button>
-        </form>
-      </section>
-
-      <!-- CADASTRAR PET -->
-      <section class="card" id="sec-pet">
-        <h2>🐶 Cadastrar Pet</h2>
-        <form id="form-pet">
-          <label for="pet-tutor">Tutor</label>
-          <select id="pet-tutor" required></select>
-          <label for="pet-nome">Nome do pet</label>
-          <input type="text" id="pet-nome" placeholder="Nome do pet" required maxlength="100">
-          <label for="pet-especie">Espécie</label>
-          <input type="text" id="pet-especie" placeholder="Ex: cachorro, gato" required maxlength="50">
-          <label for="pet-raca">Raça</label>
-          <input type="text" id="pet-raca" placeholder="Ex: labrador, vira-lata" maxlength="50">
-          <button type="submit">Cadastrar Pet</button>
-        </form>
-      </section>
-
-      <!-- AGENDAR BANHO -->
-      <section class="card" id="sec-agendar">
-        <h2>🛁 Agendar Banho</h2>
-        <form id="form-agendamento">
-          <label for="agendamento-pet">Pet</label>
-          <select id="agendamento-pet" required></select>
-          <label for="agendamento-dia">Data</label>
-          <input type="date" id="agendamento-dia" required>
-          <label for="agendamento-hora">Horário</label>
-          <select id="agendamento-hora" required>
-            <option value="">Selecione o horário</option>
-          </select>
-          <button type="submit">Agendar</button>
-        </form>
-      </section>
+    <div class="tabs">
+      <button type="button" class="tab-btn active" data-tab="cadastros">📋 Cadastros</button>
+      <button type="button" class="tab-btn" data-tab="agenda">📅 Agenda de Banhos</button>
     </div>
 
-    <!-- AGENDA -->
-    <section class="card" id="sec-agenda">
-      <h2>📅 Agenda de Banhos</h2>
-      <div class="filtros">
-        <label for="filtro-status">Mostrar:</label>
-        <select id="filtro-status">
-          <option value="agendado">Agendados</option>
-          <option value="todos">Todos</option>
-          <option value="concluido">Concluídos</option>
-          <option value="cancelado">Cancelados</option>
-        </select>
+    <!-- PAINEL: CADASTROS -->
+    <div id="painel-cadastros" class="painel">
+      <div class="grid">
+        <!-- CADASTRAR TUTOR -->
+        <section class="card" id="sec-tutor">
+          <h2>👤 Cadastrar Tutor</h2>
+          <form id="form-tutor">
+            <label for="tutor-nome">Nome completo</label>
+            <input type="text" id="tutor-nome" placeholder="Nome e sobrenome do tutor" required maxlength="100">
+            <label for="tutor-cpf">CPF</label>
+            <input type="text" id="tutor-cpf" placeholder="000.000.000-00" required maxlength="14">
+            <label for="tutor-telefone">Telefone</label>
+            <input type="tel" id="tutor-telefone" placeholder="(11) 99999-9999" maxlength="20">
+            <button type="submit">Cadastrar Tutor</button>
+          </form>
+        </section>
+
+        <!-- CADASTRAR PET -->
+        <section class="card" id="sec-pet">
+          <h2>🐶 Cadastrar Pet</h2>
+          <form id="form-pet">
+            <label for="pet-tutor">Tutor</label>
+            <select id="pet-tutor" required></select>
+            <label for="pet-nome">Nome do pet</label>
+            <input type="text" id="pet-nome" placeholder="Nome do pet" required maxlength="100">
+            <label for="pet-especie">Espécie</label>
+            <input type="text" id="pet-especie" placeholder="Ex: cachorro, gato" required maxlength="50">
+            <label for="pet-raca">Raça</label>
+            <input type="text" id="pet-raca" placeholder="Ex: labrador, vira-lata" maxlength="50">
+            <button type="submit">Cadastrar Pet</button>
+          </form>
+        </section>
       </div>
-      <div class="tabela-wrap">
-        <table id="tabela-agendamentos">
-          <thead>
-            <tr>
-              <th>Pet</th>
-              <th>Tutor</th>
-              <th>Data/Hora</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+    </div>
+
+    <!-- PAINEL: AGENDA -->
+    <div id="painel-agenda" class="painel" hidden>
+      <div class="grid grid-1">
+        <!-- AGENDAR BANHO -->
+        <section class="card" id="sec-agendar">
+          <h2>🛁 Agendar Banho</h2>
+          <form id="form-agendamento">
+            <label for="agendamento-pet">Pet</label>
+            <select id="agendamento-pet" required></select>
+            <label for="agendamento-servico">Serviço</label>
+            <select id="agendamento-servico" required>
+              <option value="banho">Banho (1h)</option>
+              <option value="banho_tosa">Banho e Tosa (2h)</option>
+            </select>
+            <label for="agendamento-dia">Data</label>
+            <input type="date" id="agendamento-dia" required>
+            <label for="agendamento-hora">Horário</label>
+            <select id="agendamento-hora" required>
+              <option value="">Selecione o horário</option>
+            </select>
+            <button type="submit">Agendar</button>
+          </form>
+        </section>
       </div>
-      <p id="vazio" class="vazio" hidden>🐾 Nenhum agendamento por aqui ainda. Cadastre um tutor, um pet e marque o primeiro banho!</p>
-    </section>
+
+      <!-- AGENDA -->
+      <section class="card" id="sec-agenda">
+        <h2>📅 Agenda de Banhos</h2>
+        <div class="filtros">
+          <label for="filtro-status">Mostrar:</label>
+          <select id="filtro-status">
+            <option value="agendado">Agendados</option>
+            <option value="todos">Todos</option>
+            <option value="concluido">Concluídos</option>
+            <option value="cancelado">Cancelados</option>
+          </select>
+        </div>
+        <div class="tabela-wrap">
+          <table id="tabela-agendamentos">
+            <thead>
+              <tr>
+                <th>Pet</th>
+                <th>Tutor</th>
+                <th>Serviço</th>
+                <th>Data/Hora</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="vazio" class="vazio" hidden>🐾 Nenhum agendamento por aqui ainda. Cadastre um tutor, um pet e marque o primeiro banho!</p>
+      </section>
+    </div>
 
   </main>
 
@@ -138,3 +159,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
