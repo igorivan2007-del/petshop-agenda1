@@ -131,6 +131,46 @@ main {
 .badge-cancelado { background: #fee2e2; color: #b91c1c; }
 .badge-concluido { background: #dcfce7; color: #15803d; }
 
+/* ABAS */
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .2s;
+  margin-top: 0;
+  font-size: 0.9rem;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: white;
+  border-color: transparent;
+}
+
+.painel[hidden] {
+  display: none;
+}
+
+.grid-1 {
+  grid-template-columns: minmax(280px, 420px);
+  margin-bottom: 20px;
+}
+
 .grid .card {
   margin-bottom: 0;
 }
