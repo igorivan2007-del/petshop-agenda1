@@ -22,13 +22,13 @@ function criarApiSupabase() {
     listarTutores: async () => ok(await db.from("tutor").select("id_tutor, nome").order("nome")),
     criarTutor: async (t) => ok(await db.from("tutor").insert(t)),
     listarPets: async () =>
-      ok(await db.from("pet").select("id_pet, nome, tutor(nome)").order("nome")),
+      ok(await db.from("pet").select("id_pet, nome, especie, raca, tutor(nome)").order("nome")),
     criarPet: async (p) => ok(await db.from("pet").insert(p)),
     listarAgendamentos: async () =>
       ok(
         await db
           .from("agendamento")
-          .select("id_agendamento, data_hora, status, pet(nome, especie, tutor(nome))")
+          .select("id_agendamento, data_hora, status, pet(nome, especie, raca, tutor(nome))")
           .order("data_hora")
       ),
     criarAgendamento: async (a) => ok(await db.from("agendamento").insert(a)),
@@ -239,9 +239,13 @@ function atualizarResumo() {
 // ===================================================
 formTutor.addEventListener("submit", (e) => {
   e.preventDefault();
+  const nome = $("tutor-nome").value.trim();
+  if (nome.split(/\s+/).filter(Boolean).length < 2) {
+    return aviso("Digite o nome completo (nome e sobrenome).", true);
+  }
   comBotao(formTutor, async () => {
     await api.criarTutor({
-      nome: $("tutor-nome").value.trim(),
+      nome,
       telefone: $("tutor-telefone").value.trim() || null,
     });
     formTutor.reset();
@@ -260,6 +264,7 @@ formPet.addEventListener("submit", (e) => {
       id_tutor: selectPetTutor.value,
       nome: $("pet-nome").value.trim(),
       especie: $("pet-especie").value.trim(),
+      raca: $("pet-raca").value.trim() || null,
     });
     formPet.reset();
     aviso("Pet cadastrado!");
@@ -312,7 +317,7 @@ async function carregarPets() {
   try {
     const data = await api.listarPets();
     totalPets = data.length;
-    preencherSelect(selectAgendamentoPet, data.length ? "Selecione o pet" : "Cadastre um pet primeiro", data, (p) => p.id_pet, (p) => `${p.nome} (tutor: ${p.tutor?.nome ?? "?"})`);
+    preencherSelect(selectAgendamentoPet, data.length ? "Selecione o pet" : "Cadastre um pet primeiro", data, (p) => p.id_pet, (p) => `${p.nome}${p.raca ? " - " + p.raca : ""} (tutor: ${p.tutor?.nome ?? "?"})`);
     atualizarResumo();
   } catch (e) {
     aviso("Erro ao carregar pets: " + e.message, true);
