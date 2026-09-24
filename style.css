@@ -400,9 +400,29 @@ th {
 }
 
 /* CONSULTA DE CADASTROS */
-.consulta-barra { display:grid; grid-template-columns:1fr 160px; gap:10px; margin-bottom:8px; }
-.lista-cadastros { display:grid; gap:10px; margin-top:14px; }
-.item-cadastro { border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; background:#f8fafc; }
-.item-cadastro strong { color:#1d4ed8; }
-.item-cadastro small { display:block; color:#64748b; margin-top:4px; }
-@media (max-width:640px) { .consulta-barra { grid-template-columns:1fr; } }
+.consulta-barra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.lista-cadastros {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.lista-cadastros[hidden] { display: none; }
+.item-cadastro {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+.item-cadastro strong { color: #1d4ed8; }
+.item-cadastro small { display: block; color: #64748b; margin-top: 4px; }
+@media (max-width: 640px) {
+  .consulta-barra { grid-template-columns: 1fr; }
+}
