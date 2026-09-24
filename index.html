@@ -61,8 +61,11 @@
         <section class="card" id="sec-pet">
           <h2>🐶 Cadastrar Pet</h2>
           <form id="form-pet">
+            <label for="pesquisa-tutor">Pesquisar tutor</label>
+            <input type="search" id="pesquisa-tutor" placeholder="Digite o nome ou CPF do tutor" autocomplete="off">
             <label for="pet-tutor">Tutor</label>
             <select id="pet-tutor" required></select>
+            <p id="pesquisa-tutor-info" class="ajuda">Digite acima para encontrar o tutor rapidamente.</p>
             <label for="pet-nome">Nome do pet</label>
             <input type="text" id="pet-nome" placeholder="Nome do pet" required maxlength="100">
             <label for="pet-especie">Espécie</label>
@@ -178,5 +181,3 @@
   <script src="app.js" defer></script>
 </body>
 </html>
-
-
