@@ -79,11 +79,15 @@
     <section class="card" id="sec-consulta">
       <h2>🔎 Consultar Cadastros</h2>
       <div class="consulta-barra">
-        <input type="search" id="pesquisa-cadastros" placeholder="Pesquisar tutor, CPF, telefone, pet, espécie ou raça">
-        <select id="tipo-cadastro"><option value="todos">Todos</option><option value="tutores">Tutores</option><option value="pets">Pets</option></select>
+        <input type="search" id="pesquisa-cadastros" placeholder="Digite nome, CPF, telefone, pet, espécie ou raça" autocomplete="off">
+        <select id="tipo-cadastro">
+          <option value="todos">Todos</option>
+          <option value="tutores">Tutores</option>
+          <option value="pets">Pets</option>
+        </select>
       </div>
-      <p id="resultado-contagem" class="ajuda"></p>
-      <div id="lista-cadastros" class="lista-cadastros"></div>
+      <p id="resultado-contagem" class="ajuda">Digite algo para pesquisar um cadastro.</p>
+      <div id="lista-cadastros" class="lista-cadastros" hidden></div>
       <p id="cadastros-vazio" class="vazio" hidden>Nenhum cadastro encontrado.</p>
     </section>
 
@@ -94,8 +98,11 @@
         <section class="card" id="sec-agendar">
           <h2>🛁 Agendar Banho</h2>
           <form id="form-agendamento">
+            <label for="pesquisa-pet">Pesquisar cadastro</label>
+            <input type="search" id="pesquisa-pet" placeholder="Digite o nome do pet ou tutor" autocomplete="off">
             <label for="agendamento-pet">Pet</label>
             <select id="agendamento-pet" required></select>
+            <p id="pesquisa-pet-info" class="ajuda">Digite acima para encontrar o cadastro rapidamente.</p>
             <label for="agendamento-servico">Serviço</label>
             <select id="agendamento-servico" required>
               <option value="banho">Banho (1h)</option>
